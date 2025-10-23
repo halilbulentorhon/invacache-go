@@ -1,14 +1,19 @@
 package config
 
 import (
-	"github.com/halilbulentorhon/invacache-go/constant"
 	"time"
+
+	"github.com/halilbulentorhon/invacache-go/constant"
 )
 
 type InvaCacheConfig struct {
 	BackendName  string              `json:"backendName"`
-	InMemory     InMemoryConfig      `json:"inMemory"`
+	Backend      *BackendConfig      `json:"backend"`
 	Invalidation *InvalidationConfig `json:"invalidation,omitempty"`
+}
+
+type BackendConfig struct {
+	InMemory *InMemoryConfig `json:"inMemory"`
 }
 
 type InMemoryConfig struct {
@@ -18,40 +23,25 @@ type InMemoryConfig struct {
 }
 
 type InvalidationConfig struct {
-	Type      string                       `json:"type"`
-	Couchbase *CouchbaseInvalidationConfig `json:"couchbase,omitempty"`
-	Redis     *RedisInvalidationConfig     `json:"redis,omitempty"`
-}
-
-type CouchbaseInvalidationConfig struct {
-	ConnectionString string        `json:"connectionString"`
-	Username         string        `json:"username"`
-	Password         string        `json:"password"`
-	BucketName       string        `json:"bucketName"`
-	CollectionName   string        `json:"collectionName"`
-	ScopeName        string        `json:"scopeName,omitempty"`
-	GroupName        string        `json:"groupName,omitempty"`
-	PollInterval     time.Duration `json:"pollInterval"`
-}
-
-type RedisInvalidationConfig struct {
-	Address     string        `json:"address"`
-	Password    string        `json:"password,omitempty"`
-	DB          int           `json:"db"`
-	Channel     string        `json:"channel,omitempty"`
-	PoolSize    int           `json:"poolSize,omitempty"`
-	MaxRetries  int           `json:"maxRetries,omitempty"`
-	DialTimeout time.Duration `json:"dialTimeout,omitempty"`
+	Type         string         `json:"type"`
+	DriverConfig map[string]any `json:"driverConfig,omitempty"`
 }
 
 func (cfg *InvaCacheConfig) ApplyDefaults() {
-	if cfg.InMemory.Capacity <= 0 {
-		cfg.InMemory.Capacity = constant.DefaultCapacity
+	if cfg.Backend == nil {
+		cfg.Backend = &BackendConfig{}
 	}
-	if cfg.InMemory.ShardCount <= 0 {
-		cfg.InMemory.ShardCount = constant.DefaultShardCount
+	if cfg.Backend.InMemory == nil {
+		cfg.Backend.InMemory = &InMemoryConfig{}
 	}
-	if cfg.InMemory.SweeperInterval <= 0 {
-		cfg.InMemory.SweeperInterval = constant.DefaultSweeperInterval
+
+	if cfg.Backend.InMemory.Capacity <= 0 {
+		cfg.Backend.InMemory.Capacity = constant.DefaultCapacity
+	}
+	if cfg.Backend.InMemory.ShardCount <= 0 {
+		cfg.Backend.InMemory.ShardCount = constant.DefaultShardCount
+	}
+	if cfg.Backend.InMemory.SweeperInterval <= 0 {
+		cfg.Backend.InMemory.SweeperInterval = constant.DefaultSweeperInterval
 	}
 }

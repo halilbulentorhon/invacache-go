@@ -21,22 +21,23 @@ type User struct {
 func main() {
 	// Create cache configuration with Redis invalidation
 	cfg := config.InvaCacheConfig{
-		InMemory: config.InMemoryConfig{
+		BackendName: "in-memory",
+		Backend: &config.BackendConfig{InMemory: &config.InMemoryConfig{
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
-		},
+		}},
 		// Enable distributed invalidation using Redis Pub/Sub
 		Invalidation: &config.InvalidationConfig{
 			Type: "redis",
-			Redis: &config.RedisInvalidationConfig{
-				Address:     "localhost:6379", // Redis server address
-				Password:    "",               // Redis password (empty for no auth)
-				DB:          0,                // Redis database number
-				Channel:     "invacache:demo", // Custom channel name
-				PoolSize:    10,               // Connection pool size
-				MaxRetries:  3,                // Maximum retry attempts
-				DialTimeout: 5 * time.Second,  // Connection timeout
+			DriverConfig: map[string]any{
+				"Address":     "localhost:6379",
+				"Password":    "",
+				"DB":          0,
+				"Channel":     "invacache:demo",
+				"PoolSize":    10,
+				"MaxRetries":  3,
+				"DialTimeout": 5 * time.Second,
 			},
 		},
 	}
@@ -44,7 +45,10 @@ func main() {
 	fmt.Println("=== InvaCache with Redis Invalidation Demo ===")
 
 	// Create cache instance
-	cache := invacache.NewInMemory[User](cfg)
+	cache, err := invacache.NewCache[User](cfg)
+	if err != nil {
+		panic(err)
+	}
 	defer cache.Close() // Always cleanup resources and stop background goroutines
 
 	// Note: In a real scenario, you would have multiple instances of this cache
@@ -64,7 +68,7 @@ func main() {
 
 	for _, user := range users {
 		key := fmt.Sprintf("user:%d", user.ID)
-		err := cache.Set(key, user, option.WithTTL(5*time.Minute))
+		err = cache.Set(key, user, option.WithTTL(5*time.Minute))
 		if err != nil {
 			fmt.Printf("Error setting user %d: %v\n", user.ID, err)
 		} else {

@@ -7,27 +7,34 @@ import (
 	"github.com/halilbulentorhon/cb-pubsub/config"
 	"github.com/halilbulentorhon/cb-pubsub/pubsub"
 	"github.com/halilbulentorhon/invacache-go/backend/invalidation"
-	invacacheConfig "github.com/halilbulentorhon/invacache-go/config"
 )
 
 func init() {
-	invalidation.RegisterInvalidator("couchbase", func(config interface{}) (invalidation.PubSub, error) {
-		switch cfg := config.(type) {
-		case *invacacheConfig.CouchbaseInvalidationConfig:
-			driverConfig := CouchbaseConfig{
-				ConnectionString: cfg.ConnectionString,
-				Username:         cfg.Username,
-				Password:         cfg.Password,
-				BucketName:       cfg.BucketName,
-				CollectionName:   cfg.CollectionName,
-				ScopeName:        cfg.ScopeName,
-				GroupName:        cfg.GroupName,
-			}
-			return NewCouchbaseInvalidator(driverConfig)
-		default:
-			return nil, fmt.Errorf("invalid config type for couchbase invalidator, expected *config.CouchbaseInvalidationConfig, got %T", config)
+	invalidation.RegisterInvalidator("couchbase", func(config any) (invalidation.PubSub, error) {
+		cfgMap, ok := config.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("invalid config type for couchbase invalidator, expected map[string]any, got %T", config)
 		}
+
+		cfg := CouchbaseConfig{
+			ConnectionString: getString(cfgMap, "ConnectionString"),
+			Username:         getString(cfgMap, "Username"),
+			Password:         getString(cfgMap, "Password"),
+			BucketName:       getString(cfgMap, "BucketName"),
+			CollectionName:   getString(cfgMap, "CollectionName"),
+			ScopeName:        getString(cfgMap, "ScopeName"),
+			GroupName:        getString(cfgMap, "GroupName"),
+		}
+
+		return NewCouchbaseInvalidator(cfg)
 	})
+}
+
+func getString(m map[string]any, key string) string {
+	if val, ok := m[key].(string); ok {
+		return val
+	}
+	return ""
 }
 
 type CouchbaseConfig struct {
