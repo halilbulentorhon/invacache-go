@@ -7,3 +7,7 @@ const (
 	DefaultShardCount      = 8
 	DefaultSweeperInterval = 10 * time.Minute
 )
+
+const (
+	InMemoryBackend = "in-memory"
+)

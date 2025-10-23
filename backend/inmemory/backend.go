@@ -144,26 +144,26 @@ func (i *inMemoryBackend[V]) getShard(key string) *inMemoryShard[V] {
 func getInvalidatorConfig(cfg *config.InvalidationConfig) interface{} {
 	switch cfg.Type {
 	case constant.CouchbaseInvalidationConfigType:
-		return cfg.Couchbase
+		return cfg.DriverConfig
 	case constant.RedisInvalidationConfigType:
-		return cfg.Redis
+		return cfg.DriverConfig
 	default:
 		return nil
 	}
 }
 
-func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) backend.Cache[V] {
+func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) (backend.Cache[V], error) {
 	log := logger.NewLogger("inmemory-cache")
 	cfg.ApplyDefaults()
 
 	log.Info("initializing inmemory cache",
-		"shard_count", cfg.InMemory.ShardCount,
-		"capacity", cfg.InMemory.Capacity,
-		"sweeper_interval", cfg.InMemory.SweeperInterval)
+		"shard_count", cfg.Backend.InMemory.ShardCount,
+		"capacity", cfg.Backend.InMemory.Capacity,
+		"sweeper_interval", cfg.Backend.InMemory.SweeperInterval)
 
-	shards := make([]inMemoryShard[V], cfg.InMemory.ShardCount)
-	baseCapacity := cfg.InMemory.Capacity / cfg.InMemory.ShardCount
-	remainder := cfg.InMemory.Capacity % cfg.InMemory.ShardCount
+	shards := make([]inMemoryShard[V], cfg.Backend.InMemory.ShardCount)
+	baseCapacity := cfg.Backend.InMemory.Capacity / cfg.Backend.InMemory.ShardCount
+	remainder := cfg.Backend.InMemory.Capacity % cfg.Backend.InMemory.ShardCount
 	for i := range shards {
 		capacity := baseCapacity
 		if i == len(shards)-1 && remainder > 0 {
@@ -182,7 +182,7 @@ func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) backend.Cache[V] {
 	}
 
 	for i := range shards {
-		go be.runSweeper(&shards[i], cfg.InMemory.SweeperInterval)
+		go be.runSweeper(&shards[i], cfg.Backend.InMemory.SweeperInterval)
 	}
 
 	if cfg.Invalidation != nil {
@@ -203,9 +203,9 @@ func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) backend.Cache[V] {
 			}()
 		} else {
 			log.Error("failed to create invalidator", "type", cfg.Invalidation.Type, "error", err)
-			panic(fmt.Sprintf("failed to create invalidator: %v\n", err))
+			return nil, fmt.Errorf("failed to create invalidator: %w", err)
 		}
 	}
 
-	return be
+	return be, nil
 }

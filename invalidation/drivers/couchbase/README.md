@@ -23,25 +23,31 @@ import (
 
 func main() {
     cfg := config.InvaCacheConfig{
-        InMemory: config.InMemoryConfig{
-            ShardCount: 16,
-            Capacity:   10000,
+        BackendName: "in-memory",
+        Backend: &config.BackendConfig{
+            InMemory: &config.InMemoryConfig{
+                ShardCount: 16,
+                Capacity:   10000,
+            },
         },
         Invalidation: &config.InvalidationConfig{
             Type: "couchbase",
-            Couchbase: &config.CouchbaseInvalidationConfig{
-                ConnectionString: "localhost:8091",
-                Username:         "admin",
-                Password:         "password",
-                BucketName:       "default",
-                CollectionName:   "_default",
-                ScopeName:        "_default",
-                GroupName:        "my-cache-group",
+            DriverConfig: map[string]any{
+                "ConnectionString": "localhost:8091",
+                "Username":         "admin",
+                "Password":         "password",
+                "BucketName":       "default",
+                "CollectionName":   "_default",
+                "ScopeName":        "_default",
+                "GroupName":        "my-cache-group",
             },
         },
     }
     
-    cache := invacache.NewInMemory[string](cfg)
+    cache, err := invacache.NewCache[string](cfg)
+    if err != nil {
+        panic(err)
+    }
     defer cache.Close() // Always cleanup resources
     
     // Cache will now use Couchbase for distributed invalidation

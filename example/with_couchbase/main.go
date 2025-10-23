@@ -21,22 +21,23 @@ type User struct {
 func main() {
 	// Create cache configuration with Couchbase invalidation
 	cfg := config.InvaCacheConfig{
-		InMemory: config.InMemoryConfig{
+		BackendName: "in-memory",
+		Backend: &config.BackendConfig{InMemory: &config.InMemoryConfig{
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
-		},
+		}},
 		// Enable distributed invalidation using cb-pubsub
 		Invalidation: &config.InvalidationConfig{
 			Type: "couchbase",
-			Couchbase: &config.CouchbaseInvalidationConfig{
-				ConnectionString: "localhost:8091",
-				Username:         "Administrator",
-				Password:         "password",
-				BucketName:       "PubSub",
-				CollectionName:   "_default",
-				ScopeName:        "_default",       // Optional, defaults to "_default"
-				GroupName:        "invacache-demo", // Optional, defaults to "invacache"
+			DriverConfig: map[string]any{
+				"ConnectionString": "localhost:8091",
+				"Username":         "Administrator",
+				"Password":         "password",
+				"BucketName":       "PubSub",
+				"CollectionName":   "_default",
+				"ScopeName":        "_default",
+				"GroupName":        "invacache-demo",
 			},
 		},
 	}
@@ -44,7 +45,10 @@ func main() {
 	fmt.Println("=== InvaCache with Couchbase Invalidation Demo ===")
 
 	// Create cache instance
-	cache := invacache.NewInMemory[User](cfg)
+	cache, err := invacache.NewCache[User](cfg)
+	if err != nil {
+		panic(err)
+	}
 	defer cache.Close() // Always cleanup resources and stop background goroutines
 
 	// Note: In a real scenario, you would have multiple instances of this cache
@@ -63,7 +67,7 @@ func main() {
 
 	for _, user := range users {
 		key := fmt.Sprintf("user:%d", user.ID)
-		err := cache.Set(key, user, option.WithTTL(5*time.Minute))
+		err = cache.Set(key, user, option.WithTTL(5*time.Minute))
 		if err != nil {
 			fmt.Printf("Error setting user %d: %v\n", user.ID, err)
 		} else {

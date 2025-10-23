@@ -71,19 +71,25 @@ import (
 func main() {
 	// Create cache configuration
 	cfg := config.InvaCacheConfig{
-		InMemory: config.InMemoryConfig{
-			ShardCount:      16,               // Number of shards for concurrent access
-			Capacity:        10000,            // Maximum number of items
-			SweeperInterval: 30 * time.Second, // Cleanup interval
+		BackendName: "in-memory",
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      16,               // Number of shards for concurrent access
+				Capacity:        10000,            // Maximum number of items
+				SweeperInterval: 30 * time.Second, // Cleanup interval
+			},
 		},
 	}
 
 	// Create a new cache instance for string values
-	cache := invacache.NewInMemory[string](cfg)
+	cache, err := invacache.NewCache[string](cfg)
+	if err != nil {
+		panic(err)
+	}
 	defer cache.Close() // Always cleanup resources
 
 	// Set a value with TTL
-	err := cache.Set("user:123", "John Doe", option.WithTTL(5*time.Minute))
+	err = cache.Set("user:123", "John Doe", option.WithTTL(5*time.Minute))
 	if err != nil {
 		panic(err)
 	}
@@ -127,17 +133,20 @@ type Cache[V any] interface {
 
 ```go
 type InvaCacheConfig struct {
-    InMemory     InMemoryConfig      `json:"inMemory"`
+    BackendName  string              `json:"backendName"`
+    Backend      *BackendConfig      `json:"backend"`
     Invalidation *InvalidationConfig `json:"invalidation,omitempty"`
+}
+
+type BackendConfig struct {
+    InMemory *InMemoryConfig `json:"inMemory"`
 }
 
 type InMemoryConfig struct {
     ShardCount      int           `json:"shardCount"`      // Default: 8
-    SweeperInterval time.Duration `json:"sweeperInterval"` // Default: 1s
+    SweeperInterval time.Duration `json:"sweeperInterval"` // Default: 10 minutes
     Capacity        int           `json:"capacity"`        // Default: 1000
 }
-
-```
 
 ### Options
 
@@ -154,7 +163,10 @@ type User struct {
     Name string `json:"name"`
 }
 
-cache := invacache.NewInMemory[User](cfg)
+cache, err := invacache.NewCache[User](cfg)
+if err != nil {
+	panic(err)
+}
 defer cache.Close() // Always cleanup resources
 
 user := User{ID: 1, Name: "John"}
@@ -168,15 +180,21 @@ InvaCache-Go includes built-in structured logging to help you monitor cache oper
 #### Production Logging (JSON format, Info level)
 
 ```go
-cache := invacache.NewInMemory[string](cfg)
+cache, err := invacache.NewCache[string](cfg)
+if err != nil {
+	panic(err)
+}
 ```
 
 #### Development Logging (Text format, Debug level)
 
 ```go
-// Note: NewInMemoryDev function is not implemented yet
-// Use NewInMemory with custom logger configuration for development
-cache := invacache.NewInMemory[string](cfg)
+// Note: NewCache function handles backend selection based on BackendName
+// Use NewCache with custom logger configuration for development
+cache, err := invacache.NewCache[string](cfg)
+if err != nil {
+	panic(err)
+}
 ```
 
 #### Log Levels
@@ -230,25 +248,31 @@ import (
 )
 
 cfg := config.InvaCacheConfig{
-    InMemory: config.InMemoryConfig{
-        ShardCount: 16,
-        Capacity:   10000,
+    BackendName: "in-memory",
+    Backend: &config.BackendConfig{
+        InMemory: &config.InMemoryConfig{
+            ShardCount: 16,
+            Capacity:   10000,
+        },
     },
     Invalidation: &config.InvalidationConfig{
         Type: "couchbase",
-        Couchbase: &config.CouchbaseInvalidationConfig{
-            ConnectionString: "localhost:8091",
-            Username:         "admin",
-            Password:         "password",
-            BucketName:       "default",
-            CollectionName:   "_default",
-            ScopeName:        "_default",
-            GroupName:        "my-cache-group",
+        DriverConfig: map[string]any{
+            "ConnectionString": "localhost:8091",
+            "Username":         "admin",
+            "Password":         "password",
+            "BucketName":       "default",
+            "CollectionName":   "_default",
+            "ScopeName":        "_default",
+            "GroupName":        "my-cache-group",
         },
     },
 }
 
-cache := invacache.NewInMemory[string](cfg)
+cache, err := invacache.NewCache[string](cfg)
+if err != nil {
+	panic(err)
+}
 
 // Important: Always close the cache to properly cleanup resources
 defer cache.Close() // This will stop invalidation goroutines and cleanup connections
@@ -285,25 +309,31 @@ import (
 )
 
 cfg := config.InvaCacheConfig{
-    InMemory: config.InMemoryConfig{
-        ShardCount: 16,
-        Capacity:   10000,
+    BackendName: "in-memory",
+    Backend: &config.BackendConfig{
+        InMemory: &config.InMemoryConfig{
+            ShardCount: 16,
+            Capacity:   10000,
+        },
     },
     Invalidation: &config.InvalidationConfig{
         Type: "redis",
-        Redis: &config.RedisInvalidationConfig{
-            Address:     "localhost:6379",
-            Password:    "",
-            DB:          0,
-            Channel:     "invacache:invalidation",
-            PoolSize:    10,
-            MaxRetries:  3,
-            DialTimeout: 5 * time.Second,
+        DriverConfig: map[string]any{
+            "Address":     "localhost:6379",
+            "Password":    "",
+            "DB":          0,
+            "Channel":     "invacache:invalidation",
+            "PoolSize":    10,
+            "MaxRetries":  3,
+            "DialTimeout": 5 * time.Second,
         },
     },
 }
 
-cache := invacache.NewInMemory[string](cfg)
+cache, err := invacache.NewCache[string](cfg)
+if err != nil {
+	panic(err)
+}
 defer cache.Close() // Always cleanup resources
 ```
 

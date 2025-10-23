@@ -6,28 +6,49 @@ import (
 	"time"
 
 	"github.com/halilbulentorhon/invacache-go/backend/invalidation"
-	invacacheConfig "github.com/halilbulentorhon/invacache-go/config"
 	"github.com/redis/go-redis/v9"
 )
 
 func init() {
-	invalidation.RegisterInvalidator("redis", func(config interface{}) (invalidation.PubSub, error) {
-		switch cfg := config.(type) {
-		case *invacacheConfig.RedisInvalidationConfig:
-			driverConfig := RedisConfig{
-				Address:     cfg.Address,
-				Password:    cfg.Password,
-				DB:          cfg.DB,
-				Channel:     cfg.Channel,
-				PoolSize:    cfg.PoolSize,
-				MaxRetries:  cfg.MaxRetries,
-				DialTimeout: cfg.DialTimeout,
-			}
-			return NewRedisInvalidator(driverConfig)
-		default:
-			return nil, fmt.Errorf("invalid config type for redis invalidator, expected *config.RedisInvalidationConfig, got %T", config)
+	invalidation.RegisterInvalidator("redis", func(config any) (invalidation.PubSub, error) {
+		cfgMap, ok := config.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("invalid config type for redis invalidator, expected map[string]any, got %T", config)
 		}
+
+		cfg := RedisConfig{
+			Address:     getString(cfgMap, "Address"),
+			Password:    getString(cfgMap, "Password"),
+			DB:          getInt(cfgMap, "DB"),
+			Channel:     getString(cfgMap, "Channel"),
+			PoolSize:    getInt(cfgMap, "PoolSize"),
+			MaxRetries:  getInt(cfgMap, "MaxRetries"),
+			DialTimeout: getDuration(cfgMap, "DialTimeout"),
+		}
+
+		return NewRedisInvalidator(cfg)
 	})
+}
+
+func getString(m map[string]any, key string) string {
+	if val, ok := m[key].(string); ok {
+		return val
+	}
+	return ""
+}
+
+func getInt(m map[string]any, key string) int {
+	if val, ok := m[key].(int); ok {
+		return val
+	}
+	return 0
+}
+
+func getDuration(m map[string]any, key string) time.Duration {
+	if val, ok := m[key].(time.Duration); ok {
+		return val
+	}
+	return 0
 }
 
 type RedisConfig struct {

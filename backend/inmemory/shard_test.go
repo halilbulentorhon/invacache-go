@@ -1,347 +1,439 @@
 package inmemory
 
 import (
-	"github.com/halilbulentorhon/invacache-go/backend/option"
-	"github.com/halilbulentorhon/invacache-go/config"
-	"github.com/halilbulentorhon/invacache-go/constant"
-	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/halilbulentorhon/invacache-go/backend/option"
+	"github.com/halilbulentorhon/invacache-go/constant"
 )
 
-func TestShardBasicOperations(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
+func TestNewInMemoryShard(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+	if shard.capacity != 10 {
+		t.Errorf("expected capacity 10, got %d", shard.capacity)
+	}
+	if shard.count != 0 {
+		t.Errorf("expected count 0, got %d", shard.count)
+	}
+	if shard.items == nil {
+		t.Error("items map should be initialized")
+	}
+	if shard.head == nil || shard.tail == nil {
+		t.Error("head and tail should be initialized")
+	}
+	if shard.head.next != shard.tail {
+		t.Error("head.next should point to tail")
+	}
+	if shard.tail.prev != shard.head {
+		t.Error("tail.prev should point to head")
+	}
+}
 
-	err := cache.Set("key1", "value1")
+func TestShardGetNonExistentKey(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	_, err := shard.get("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for non-existent key")
+	}
+	if err.Error() != constant.ErrKeyNotFound+": nonexistent" {
+		t.Errorf("expected 'key not found' error, got: %v", err)
+	}
+}
+
+func TestShardSetAndGet(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error setting key: %v", err)
 	}
 
-	value, err := cache.Get("key1")
+	value, err := shard.get("key1")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error getting key: %v", err)
 	}
 	if value != "value1" {
 		t.Errorf("expected 'value1', got '%s'", value)
 	}
 
-	err = cache.Delete("key1")
+	if shard.count != 1 {
+		t.Errorf("expected count 1, got %d", shard.count)
+	}
+}
+
+func TestShardSetWithTTL(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1", option.WithTTL(100*time.Millisecond))
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error setting key: %v", err)
 	}
 
-	_, err = cache.Get("key1")
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	_, err = shard.get("key1")
 	if err == nil {
-		t.Error("expected error after delete")
+		t.Fatal("expected error for expired key")
+	}
+
+	if shard.count != 0 {
+		t.Errorf("expected count 0 after expiration, got %d", shard.count)
 	}
 }
 
-func TestShardExpiration(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
+func TestShardSetWithNoExpiration(t *testing.T) {
+	shard := newInMemoryShard[string](10)
 
-	cache.Set("temp", "value", option.WithTTL(30*time.Millisecond))
-
-	value, err := cache.Get("temp")
+	err := shard.set("key1", "value1", option.WithNoExpiration())
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if value != "value" {
-		t.Errorf("expected 'value', got '%s'", value)
+		t.Fatalf("unexpected error setting key: %v", err)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
-	_, err = cache.Get("temp")
-	if err == nil {
-		t.Error("expected error for expired key")
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
 	}
-	if !strings.Contains(err.Error(), constant.ErrKeyNotFound) {
-		t.Errorf("expected key not found error, got: %v", err)
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
 	}
 }
 
-func TestShardCapacityEviction(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   3,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
+func TestShardUpdateExistingKey(t *testing.T) {
+	shard := newInMemoryShard[string](10)
 
-	cache.Set("key1", "value1")
-	cache.Set("key2", "value2")
-	cache.Set("key3", "value3")
-
-	_, err := cache.Get("key1")
+	err := shard.set("key1", "value1")
 	if err != nil {
-		t.Error("key1 should exist")
+		t.Fatalf("unexpected error setting key: %v", err)
 	}
 
-	cache.Set("key4", "value4")
-
-	_, err = cache.Get("key2")
-	if err == nil {
-		t.Error("key2 should have been evicted")
-	}
-
-	_, err = cache.Get("key1")
+	err = shard.set("key1", "value2")
 	if err != nil {
-		t.Error("key1 should still exist after access")
-	}
-}
-
-func TestShardLRUBehavior(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   3,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
-
-	cache.Set("first", "1")
-	cache.Set("second", "2")
-	cache.Set("third", "3")
-
-	cache.Get("first")
-	cache.Get("second")
-
-	cache.Set("fourth", "4")
-
-	_, err := cache.Get("third")
-	if err == nil {
-		t.Error("third should have been evicted as LRU")
+		t.Fatalf("unexpected error updating key: %v", err)
 	}
 
-	_, err = cache.Get("first")
+	value, err := shard.get("key1")
 	if err != nil {
-		t.Error("first should still exist")
-	}
-}
-
-func TestShardUpdateExisting(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
-
-	cache.Set("key", "old_value")
-	cache.Set("key", "new_value")
-
-	value, err := cache.Get("key")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if value != "new_value" {
-		t.Errorf("expected 'new_value', got '%s'", value)
-	}
-}
-
-func TestShardUpdateWithTTL(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
-
-	cache.Set("key", "value1")
-	cache.Set("key", "value2", option.WithTTL(30*time.Millisecond))
-
-	value, err := cache.Get("key")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error getting key: %v", err)
 	}
 	if value != "value2" {
 		t.Errorf("expected 'value2', got '%s'", value)
 	}
 
-	time.Sleep(40 * time.Millisecond)
+	if shard.count != 1 {
+		t.Errorf("expected count 1, got %d", shard.count)
+	}
+}
 
-	_, err = cache.Get("key")
+func TestShardDelete(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	err = shard.delete("key1")
+	if err != nil {
+		t.Fatalf("unexpected error deleting key: %v", err)
+	}
+
+	_, err = shard.get("key1")
 	if err == nil {
-		t.Error("key should have expired")
+		t.Fatal("expected error for deleted key")
+	}
+
+	if shard.count != 0 {
+		t.Errorf("expected count 0, got %d", shard.count)
 	}
 }
 
-func TestShardZeroTTL(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
+func TestShardDeleteNonExistentKey(t *testing.T) {
+	shard := newInMemoryShard[string](10)
 
-	cache.Set("permanent", "value", option.WithTTL(0))
-
-	time.Sleep(10 * time.Millisecond)
-
-	value, err := cache.Get("permanent")
+	err := shard.delete("nonexistent")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if value != "value" {
-		t.Errorf("expected 'value', got '%s'", value)
+		t.Fatalf("unexpected error deleting non-existent key: %v", err)
 	}
 }
 
-func TestShardDeleteNonExistent(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
+func TestShardCapacityEviction(t *testing.T) {
+	shard := newInMemoryShard[string](2)
 
-	err := cache.Delete("nonexistent")
+	err := shard.set("key1", "value1")
 	if err != nil {
-		t.Errorf("unexpected error for deleting non-existent key: %v", err)
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3: %v", err)
+	}
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Fatal("key1 should have been evicted")
+	}
+
+	_, err = shard.get("key2")
+	if err != nil {
+		t.Fatalf("unexpected error getting key2: %v", err)
+	}
+
+	_, err = shard.get("key3")
+	if err != nil {
+		t.Fatalf("unexpected error getting key3: %v", err)
+	}
+
+	if shard.count != 2 {
+		t.Errorf("expected count 2, got %d", shard.count)
+	}
+}
+
+func TestShardLRUBehavior(t *testing.T) {
+	shard := newInMemoryShard[string](2)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	_, err = shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key1: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3: %v", err)
+	}
+
+	_, err = shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key1: %v", err)
+	}
+
+	_, err = shard.get("key2")
+	if err == nil {
+		t.Fatal("key2 should have been evicted")
 	}
 }
 
 func TestShardSweepExpired(t *testing.T) {
-	backend := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:        10,
-			ShardCount:      1,
-			SweeperInterval: 100 * time.Millisecond,
-		},
-	}).(*inMemoryBackend[string])
-	defer backend.Close()
+	shard := newInMemoryShard[string](10)
 
-	backend.Set("expire1", "value1", option.WithTTL(30*time.Millisecond))
-	backend.Set("expire2", "value2", option.WithTTL(30*time.Millisecond))
-	backend.Set("keep", "value3")
-
-	time.Sleep(40 * time.Millisecond)
-
-	shard := &backend.shards[0]
-	shard.mu.Lock()
-	expiredCount := shard.sweepExpired()
-	shard.mu.Unlock()
-
-	if expiredCount != 2 {
-		t.Errorf("expected 2 expired entries, got %d", expiredCount)
+	err := shard.set("key1", "value1", option.WithTTL(50*time.Millisecond))
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
 	}
 
-	_, err := backend.Get("keep")
+	err = shard.set("key2", "value2", option.WithTTL(200*time.Millisecond))
 	if err != nil {
-		t.Error("keep should still exist")
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	expiredCount := shard.sweepExpired()
+	if expiredCount != 1 {
+		t.Errorf("expected 1 expired entry, got %d", expiredCount)
+	}
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Fatal("key1 should have been swept")
+	}
+
+	_, err = shard.get("key2")
+	if err != nil {
+		t.Fatalf("unexpected error getting key2: %v", err)
+	}
+
+	_, err = shard.get("key3")
+	if err != nil {
+		t.Fatalf("unexpected error getting key3: %v", err)
+	}
+
+	if shard.count != 2 {
+		t.Errorf("expected count 2, got %d", shard.count)
+	}
+}
+
+func TestShardSweepExpiredNoExpired(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2", option.WithTTL(1*time.Hour))
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	expiredCount := shard.sweepExpired()
+	if expiredCount != 0 {
+		t.Errorf("expected 0 expired entries, got %d", expiredCount)
+	}
+
+	if shard.count != 2 {
+		t.Errorf("expected count 2, got %d", shard.count)
+	}
+}
+
+func TestShardConcurrentAccess(t *testing.T) {
+	shard := newInMemoryShard[int](100)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			key := "key" + string(rune(i%10))
+			shard.mu.Lock()
+			err := shard.set(key, i)
+			shard.mu.Unlock()
+			if err != nil {
+				t.Errorf("unexpected error setting key: %v", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	for i := 0; i < 10; i++ {
+		key := "key" + string(rune(i))
+		shard.mu.Lock()
+		_, err := shard.get(key)
+		shard.mu.Unlock()
+		if err != nil {
+			t.Errorf("unexpected error getting key %s: %v", key, err)
+		}
+	}
+}
+
+func TestShardLinkedListOperations(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3: %v", err)
+	}
+
+	_, err = shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key1: %v", err)
+	}
+
+	if shard.head.next.Key != "key1" {
+		t.Errorf("expected key1 to be at head, got %s", shard.head.next.Key)
+	}
+
+	if shard.tail.prev.Key != "key2" {
+		t.Errorf("expected key2 to be at tail, got %s", shard.tail.prev.Key)
+	}
+}
+
+func TestShardRemoveTail(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	tailEntry := shard.removeTail()
+	if tailEntry == nil {
+		t.Fatal("expected non-nil tail entry")
+	}
+	if tailEntry.Key != "key1" {
+		t.Errorf("expected key1, got %s", tailEntry.Key)
+	}
+
+	if shard.count != 2 {
+		t.Errorf("expected count 2, got %d", shard.count)
+	}
+}
+
+func TestShardRemoveTailEmpty(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	tailEntry := shard.removeTail()
+	if tailEntry != nil {
+		t.Fatal("expected nil tail entry for empty shard")
 	}
 }
 
 func TestShardDifferentTypes(t *testing.T) {
-	intCache := NewInMemoryBackend[int](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer intCache.(*inMemoryBackend[int]).Close()
+	stringShard := newInMemoryShard[string](10)
+	intShard := newInMemoryShard[int](10)
 
-	intCache.Set("number", 42)
-	value, err := intCache.Get("number")
+	err := stringShard.set("str", "hello")
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if value != 42 {
-		t.Errorf("expected 42, got %d", value)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	type Product struct {
-		Name  string
-		ID    int
-		Price float64
-	}
-
-	productCache := NewInMemoryBackend[Product](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   10,
-			ShardCount: 1,
-		},
-	})
-	defer productCache.(*inMemoryBackend[Product]).Close()
-
-	product := Product{ID: 123, Name: "Widget", Price: 19.99}
-	productCache.Set("product:123", product)
-
-	retrieved, err := productCache.Get("product:123")
+	err = intShard.set("int", 42)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if retrieved.ID != 123 || retrieved.Name != "Widget" || retrieved.Price != 19.99 {
-		t.Errorf("expected {123 Widget 19.99}, got %+v", retrieved)
-	}
-}
-
-func TestShardLinkedListIntegrity(t *testing.T) {
-	cache := NewInMemoryBackend[string](config.InvaCacheConfig{
-		BackendName: "inmemory",
-		InMemory: config.InMemoryConfig{
-			Capacity:   5,
-			ShardCount: 1,
-		},
-	})
-	defer cache.(*inMemoryBackend[string]).Close()
-
-	backend := cache.(*inMemoryBackend[string])
-	shard := &backend.shards[0]
-
-	keys := []string{"a", "b", "c", "d", "e"}
-	for _, key := range keys {
-		cache.Set(key, "value_"+key)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	shard.mu.Lock()
-	current := shard.head.next
-	count := 0
-	for current != shard.tail {
-		count++
-		if current.prev.next != current {
-			shard.mu.Unlock()
-			t.Error("forward link broken")
-			return
-		}
-		if current.next.prev != current {
-			shard.mu.Unlock()
-			t.Error("backward link broken")
-			return
-		}
-		current = current.next
+	strValue, err := stringShard.get("str")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	shard.mu.Unlock()
+	if strValue != "hello" {
+		t.Errorf("expected 'hello', got '%s'", strValue)
+	}
 
-	if count != 5 {
-		t.Errorf("expected 5 entries in list, found %d", count)
+	intValue, err := intShard.get("int")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if intValue != 42 {
+		t.Errorf("expected 42, got %d", intValue)
 	}
 }

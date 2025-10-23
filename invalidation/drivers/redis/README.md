@@ -25,25 +25,31 @@ import (
 
 func main() {
     cfg := config.InvaCacheConfig{
-        InMemory: config.InMemoryConfig{
-            ShardCount: 16,
-            Capacity:   10000,
+        BackendName: "in-memory",
+        Backend: &config.BackendConfig{
+            InMemory: &config.InMemoryConfig{
+                ShardCount: 16,
+                Capacity:   10000,
+            },
         },
         Invalidation: &config.InvalidationConfig{
             Type: "redis",
-            Redis: &config.RedisInvalidationConfig{
-                Address:     "localhost:6379",
-                Password:    "",
-                DB:          0,
-                Channel:     "invacache:invalidation",
-                PoolSize:    10,
-                MaxRetries:  3,
-                DialTimeout: 5 * time.Second,
+            DriverConfig: map[string]any{
+                "Address":     "localhost:6379",
+                "Password":    "",
+                "DB":          0,
+                "Channel":     "invacache:invalidation",
+                "PoolSize":    10,
+                "MaxRetries":  3,
+                "DialTimeout": 5 * time.Second,
             },
         },
     }
     
-    cache := invacache.NewInMemory[string](cfg)
+    cache, err := invacache.NewCache[string](cfg)
+    if err != nil {
+        panic(err)
+    }
     defer cache.Close() // Always cleanup resources
     
     // Cache will now use Redis for distributed invalidation

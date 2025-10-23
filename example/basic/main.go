@@ -18,20 +18,24 @@ type User struct {
 func main() {
 	// Create cache configuration
 	cfg := config.InvaCacheConfig{
-		InMemory: config.InMemoryConfig{
+		BackendName: "in-memory",
+		Backend: &config.BackendConfig{InMemory: &config.InMemoryConfig{
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
-		},
+		}},
 	}
 
 	// Example 1: String cache
 	fmt.Println("=== String Cache Example ===")
-	stringCache := invacache.NewInMemory[string](cfg)
+	stringCache, err := invacache.NewCache[string](cfg)
+	if err != nil {
+		panic(err)
+	}
 	defer stringCache.Close() // Always cleanup resources
 
 	// Set a value with TTL
-	err := stringCache.Set("greeting", "Hello, World!", option.WithTTL(5*time.Minute))
+	err = stringCache.Set("greeting", "Hello, World!", option.WithTTL(5*time.Minute))
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +50,10 @@ func main() {
 
 	// Example 2: Struct cache with GetOrLoad
 	fmt.Println("\n=== User Cache Example ===")
-	userCache := invacache.NewInMemory[User](cfg)
+	userCache, err := invacache.NewCache[User](cfg)
+	if err != nil {
+		panic(err)
+	}
 	defer userCache.Close() // Always cleanup resources
 
 	// GetOrLoad pattern - loads from "database" if not in cache
