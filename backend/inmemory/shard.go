@@ -141,3 +141,14 @@ func (s *inMemoryShard[V]) removeTail() *Entry[V] {
 	s.removeEntry(lastEntry)
 	return lastEntry
 }
+
+func (s *inMemoryShard[V]) clear() {
+	s.items = make(map[string]*Entry[V])
+	head := &Entry[V]{}
+	tail := &Entry[V]{}
+	head.next = tail
+	tail.prev = head
+	s.head = head
+	s.tail = tail
+	s.count = 0
+}

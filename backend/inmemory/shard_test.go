@@ -437,3 +437,145 @@ func TestShardDifferentTypes(t *testing.T) {
 		t.Errorf("expected 42, got %d", intValue)
 	}
 }
+
+func TestShardClearEmpty(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	shard.clear()
+
+	if shard.count != 0 {
+		t.Errorf("expected count 0, got %d", shard.count)
+	}
+	if len(shard.items) != 0 {
+		t.Errorf("expected empty items map, got %d items", len(shard.items))
+	}
+	if shard.head.next != shard.tail {
+		t.Error("head.next should point to tail after clear")
+	}
+	if shard.tail.prev != shard.head {
+		t.Error("tail.prev should point to head after clear")
+	}
+}
+
+func TestShardClearWithItems(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3: %v", err)
+	}
+
+	if shard.count != 3 {
+		t.Fatalf("expected count 3 before clear, got %d", shard.count)
+	}
+
+	shard.clear()
+
+	if shard.count != 0 {
+		t.Errorf("expected count 0 after clear, got %d", shard.count)
+	}
+	if len(shard.items) != 0 {
+		t.Errorf("expected empty items map after clear, got %d items", len(shard.items))
+	}
+	if shard.head.next != shard.tail {
+		t.Error("head.next should point to tail after clear")
+	}
+	if shard.tail.prev != shard.head {
+		t.Error("tail.prev should point to head after clear")
+	}
+}
+
+func TestShardClearAndReuse(t *testing.T) {
+	shard := newInMemoryShard[string](10)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	shard.clear()
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error setting key3 after clear: %v", err)
+	}
+
+	value, err := shard.get("key3")
+	if err != nil {
+		t.Fatalf("unexpected error getting key3: %v", err)
+	}
+	if value != "value3" {
+		t.Errorf("expected 'value3', got '%s'", value)
+	}
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Error("key1 should not exist after clear")
+	}
+
+	_, err = shard.get("key2")
+	if err == nil {
+		t.Error("key2 should not exist after clear")
+	}
+
+	if shard.count != 1 {
+		t.Errorf("expected count 1 after reuse, got %d", shard.count)
+	}
+}
+
+func TestShardClearResetsCapacity(t *testing.T) {
+	shard := newInMemoryShard[string](3)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = shard.set("key3", "value3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	shard.clear()
+
+	for i := 1; i <= 3; i++ {
+		key := "newkey" + string(rune(i+48))
+		err := shard.set(key, "value")
+		if err != nil {
+			t.Fatalf("unexpected error setting %s: %v", key, err)
+		}
+	}
+
+	if shard.count != 3 {
+		t.Errorf("expected count 3, got %d", shard.count)
+	}
+
+	err = shard.set("key4", "value4")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if shard.count != 3 {
+		t.Errorf("expected count 3 after eviction, got %d", shard.count)
+	}
+}
