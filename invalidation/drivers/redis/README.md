@@ -17,6 +17,7 @@ import (
     "time"
     
     "github.com/halilbulentorhon/invacache-go"
+    "github.com/halilbulentorhon/invacache-go/backend/option"
     "github.com/halilbulentorhon/invacache-go/config"
     
     // Import the Redis invalidation driver
@@ -30,6 +31,7 @@ func main() {
             InMemory: &config.InMemoryConfig{
                 ShardCount: 16,
                 Capacity:   10000,
+                Ttl:        "5m", // Optional: Default TTL for all items
             },
         },
         Invalidation: &config.InvalidationConfig{
@@ -53,6 +55,15 @@ func main() {
     defer cache.Close() // Always cleanup resources
     
     // Cache will now use Redis for distributed invalidation
+    
+    // Example: Set with distributed invalidation
+    cache.Set("key", "value", option.WithInvalidation())
+    
+    // Example: Delete with distributed invalidation
+    cache.Delete("key", option.WithDeleteInvalidation())
+    
+    // Example: Clear all cache with distributed invalidation
+    cache.Clear(option.WithClearInvalidation())
 }
 ```
 

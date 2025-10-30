@@ -11,3 +11,7 @@ const (
 const (
 	InMemoryBackend = "in-memory"
 )
+
+const (
+	EmptyString = ""
+)

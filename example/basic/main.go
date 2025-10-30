@@ -23,6 +23,7 @@ func main() {
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
+			Ttl:             "10m",            // Default TTL for all items (optional)
 		}},
 	}
 
@@ -110,6 +111,39 @@ func main() {
 	_, err = userCache.Get("user:admin")
 	if err != nil {
 		fmt.Printf("Expected error after deletion: %v\n", err)
+	}
+
+	// Example 5: Default TTL demonstration
+	fmt.Println("\n=== Default TTL Example ===")
+	// This will use the default TTL (10m) from config
+	err = userCache.Set("user:default-ttl", User{ID: 999, Name: "Default TTL User", Age: 28})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Set user with default TTL from config (10 minutes)")
+
+	// Example 6: Clear all cache
+	fmt.Println("\n=== Clear Cache Example ===")
+	err = userCache.Set("user:temp1", User{ID: 100, Name: "Temp1", Age: 20})
+	if err != nil {
+		panic(err)
+	}
+	err = userCache.Set("user:temp2", User{ID: 200, Name: "Temp2", Age: 22})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Set 2 temporary users")
+
+	err = userCache.Clear()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Cleared all cache entries")
+
+	// Verify cache is cleared
+	_, err = userCache.Get("user:temp1")
+	if err != nil {
+		fmt.Printf("Expected: user:temp1 not found after clear: %v\n", err)
 	}
 
 	fmt.Println("\n=== Example completed successfully! ===")

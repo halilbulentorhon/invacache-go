@@ -26,6 +26,7 @@ func main() {
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
+			Ttl:             "5m",             // Default TTL for all items (optional)
 		}},
 		// Enable distributed invalidation using Redis Pub/Sub
 		Invalidation: &config.InvalidationConfig{
@@ -119,14 +120,14 @@ func main() {
 		fmt.Printf("Expected: user:2 not found after deletion: %v\n", err)
 	}
 
-	// Update a user (this will also trigger invalidation)
-	fmt.Println("\n=== Update Demo (triggers Redis invalidation) ===")
+	// Update a user with explicit invalidation (triggers Redis Pub/Sub)
+	fmt.Println("\n=== Update Demo with Invalidation Option ===")
 	updatedUser := User{ID: 1, Name: "Alice Updated", Age: 31}
-	err = cache.Set("user:1", updatedUser, option.WithTTL(10*time.Minute))
+	err = cache.Set("user:1", updatedUser, option.WithTTL(10*time.Minute), option.WithInvalidation())
 	if err != nil {
 		fmt.Printf("Error updating user: %v\n", err)
 	} else {
-		fmt.Println("Updated user:1 - invalidation message sent via Redis Pub/Sub")
+		fmt.Println("Updated user:1 with invalidation - message sent via Redis Pub/Sub")
 	}
 
 	// Verify the update
@@ -135,6 +136,21 @@ func main() {
 		fmt.Printf("Error getting updated user: %v\n", err)
 	} else {
 		fmt.Printf("Updated user: %s (ID: %d, Age: %d)\n", user.Name, user.ID, user.Age)
+	}
+
+	// Clear cache with invalidation (triggers Redis Pub/Sub to all instances)
+	fmt.Println("\n=== Clear Cache with Invalidation ===")
+	err = cache.Clear(option.WithClearInvalidation())
+	if err != nil {
+		fmt.Printf("Error clearing cache: %v\n", err)
+	} else {
+		fmt.Println("Cleared all cache - invalidation message sent to all instances via Redis")
+	}
+
+	// Verify cache is cleared
+	_, err = cache.Get("user:1")
+	if err != nil {
+		fmt.Printf("Expected: cache is empty after clear: %v\n", err)
 	}
 
 	fmt.Println("\n=== Demo completed! ===")

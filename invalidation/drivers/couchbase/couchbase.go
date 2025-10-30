@@ -3,7 +3,6 @@ package couchbase
 import (
 	"context"
 	"fmt"
-
 	"github.com/halilbulentorhon/cb-pubsub/config"
 	"github.com/halilbulentorhon/cb-pubsub/pubsub"
 	"github.com/halilbulentorhon/invacache-go/backend/invalidation"
@@ -17,13 +16,13 @@ func init() {
 		}
 
 		cfg := CouchbaseConfig{
-			ConnectionString: getString(cfgMap, "ConnectionString"),
-			Username:         getString(cfgMap, "Username"),
-			Password:         getString(cfgMap, "Password"),
-			BucketName:       getString(cfgMap, "BucketName"),
-			CollectionName:   getString(cfgMap, "CollectionName"),
-			ScopeName:        getString(cfgMap, "ScopeName"),
-			GroupName:        getString(cfgMap, "GroupName"),
+			ConnectionString: getString(cfgMap, "connectionString"),
+			Username:         getString(cfgMap, "username"),
+			Password:         getString(cfgMap, "password"),
+			BucketName:       getString(cfgMap, "bucketName"),
+			CollectionName:   getString(cfgMap, "collectionName"),
+			ScopeName:        getString(cfgMap, "scopeName"),
+			GroupName:        getString(cfgMap, "groupName"),
 		}
 
 		return NewCouchbaseInvalidator(cfg)

@@ -15,19 +15,21 @@ type inMemoryShard[V any] struct {
 	mu         sync.RWMutex
 	count      int
 	capacity   int
+	defaultTTL time.Duration
 }
 
-func newInMemoryShard[V any](capacity int) inMemoryShard[V] {
+func newInMemoryShard[V any](capacity int, defaultTTL time.Duration) inMemoryShard[V] {
 	head := &Entry[V]{}
 	tail := &Entry[V]{}
 	head.next = tail
 	tail.prev = head
 
 	return inMemoryShard[V]{
-		items:    make(map[string]*Entry[V]),
-		head:     head,
-		tail:     tail,
-		capacity: capacity,
+		items:      make(map[string]*Entry[V]),
+		head:       head,
+		tail:       tail,
+		capacity:   capacity,
+		defaultTTL: defaultTTL,
 	}
 }
 
@@ -54,8 +56,14 @@ func (s *inMemoryShard[V]) set(key string, value V, options ...option.OptFnc) er
 	cfg := option.ApplyOptions(options)
 
 	var expiresAt time.Time
-	if cfg.TTL > 0 {
-		expiresAt = time.Now().Add(cfg.TTL)
+	if !cfg.NoExpiration {
+		ttl := cfg.TTL
+		if ttl == 0 {
+			ttl = s.defaultTTL
+		}
+		if ttl > 0 {
+			expiresAt = time.Now().Add(ttl)
+		}
 	}
 
 	if existingEntry, exists := s.items[key]; exists {
@@ -140,4 +148,15 @@ func (s *inMemoryShard[V]) removeTail() *Entry[V] {
 	}
 	s.removeEntry(lastEntry)
 	return lastEntry
+}
+
+func (s *inMemoryShard[V]) clear() {
+	s.items = make(map[string]*Entry[V])
+	head := &Entry[V]{}
+	tail := &Entry[V]{}
+	head.next = tail
+	tail.prev = head
+	s.head = head
+	s.tail = tail
+	s.count = 0
 }

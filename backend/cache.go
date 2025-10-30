@@ -11,6 +11,7 @@ type Cache[V any] interface {
 	Get(key string) (V, error)
 	GetOrLoad(key string, loader LoaderFunc[V]) (V, error)
 	Set(key string, value V, options ...option.OptFnc) error
-	Delete(key string) error
+	Delete(key string, options ...option.DelOptFnc) error
+	Clear(options ...option.ClrOptFnc) error
 	Close() error
 }
