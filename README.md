@@ -77,6 +77,7 @@ func main() {
 				ShardCount:      16,               // Number of shards for concurrent access
 				Capacity:        10000,            // Maximum number of items
 				SweeperInterval: 30 * time.Second, // Cleanup interval
+				Ttl:             "10m",            // Default TTL for all items (optional)
 			},
 		},
 	}
@@ -124,7 +125,8 @@ type Cache[V any] interface {
     Get(key string) (V, error)
     GetOrLoad(key string, loader LoaderFunc[V]) (V, error)
     Set(key string, value V, options ...option.OptFnc) error
-    Delete(key string) error
+    Delete(key string, options ...option.DelOptFnc) error
+    Clear(options ...option.ClrOptFnc) error
     Close() error
 }
 ```
@@ -146,12 +148,21 @@ type InMemoryConfig struct {
     ShardCount      int           `json:"shardCount"`      // Default: 8
     SweeperInterval time.Duration `json:"sweeperInterval"` // Default: 10 minutes
     Capacity        int           `json:"capacity"`        // Default: 1000
+    Ttl             string        `json:"ttl"`             // Default TTL for all items (e.g., "10m", "1h")
 }
 
 ### Options
 
-- `option.WithTTL(duration)` - Set expiration time
+**Set Options:**
+- `option.WithTTL(duration)` - Set expiration time for specific key
 - `option.WithNoExpiration()` - Set item to never expire
+- `option.WithInvalidation()` - Trigger distributed invalidation on Set
+
+**Delete Options:**
+- `option.WithDeleteInvalidation()` - Trigger distributed invalidation on Delete
+
+**Clear Options:**
+- `option.WithClearInvalidation()` - Trigger distributed invalidation on Clear
 
 ## Advanced Usage
 
@@ -171,6 +182,18 @@ defer cache.Close() // Always cleanup resources
 
 user := User{ID: 1, Name: "John"}
 cache.Set("user:1", user, option.WithTTL(time.Hour))
+
+// Clear all cache
+err = cache.Clear()
+if err != nil {
+	panic(err)
+}
+
+// Clear with distributed invalidation
+err = cache.Clear(option.WithClearInvalidation())
+if err != nil {
+	panic(err)
+}
 ```
 
 ### Structured Logging

@@ -26,6 +26,7 @@ func main() {
 			ShardCount:      16,               // Number of shards for concurrent access
 			Capacity:        10000,            // Maximum number of items
 			SweeperInterval: 30 * time.Second, // Cleanup interval
+			Ttl:             "5m",             // Default TTL for all items (optional)
 		}},
 		// Enable distributed invalidation using cb-pubsub
 		Invalidation: &config.InvalidationConfig{
@@ -103,19 +104,38 @@ func main() {
 		fmt.Printf("Loaded user: %s (ID: %d)\n", user.Name, user.ID)
 	}
 
-	// Delete a user (this will trigger invalidation across all instances)
-	fmt.Println("\n=== Delete Demo (triggers invalidation) ===")
-	err = cache.Delete("user:2")
+	// Delete a user with explicit invalidation (triggers Couchbase pub/sub)
+	fmt.Println("\n=== Delete Demo with Invalidation Option ===")
+	err = cache.Delete("user:2", option.WithDeleteInvalidation())
 	if err != nil {
 		fmt.Printf("Error deleting user: %v\n", err)
 	} else {
-		fmt.Println("Deleted user:2 - invalidation message sent to all instances")
+		fmt.Println("Deleted user:2 with invalidation - message sent to all instances")
 	}
 
 	// Try to get deleted user
 	_, err = cache.Get("user:2")
 	if err != nil {
 		fmt.Printf("Expected: user:2 not found after deletion: %v\n", err)
+	}
+
+	// Update a user with explicit invalidation
+	fmt.Println("\n=== Update Demo with Invalidation Option ===")
+	updatedUser := User{ID: 1, Name: "Alice Updated", Age: 31}
+	err = cache.Set("user:1", updatedUser, option.WithTTL(10*time.Minute), option.WithInvalidation())
+	if err != nil {
+		fmt.Printf("Error updating user: %v\n", err)
+	} else {
+		fmt.Println("Updated user:1 with invalidation - message sent to all instances")
+	}
+
+	// Clear cache with invalidation (triggers Couchbase pub/sub to all instances)
+	fmt.Println("\n=== Clear Cache with Invalidation ===")
+	err = cache.Clear(option.WithClearInvalidation())
+	if err != nil {
+		fmt.Printf("Error clearing cache: %v\n", err)
+	} else {
+		fmt.Println("Cleared all cache - invalidation message sent to all instances")
 	}
 
 	fmt.Println("\n=== Demo completed! ===")

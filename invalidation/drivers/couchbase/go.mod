@@ -3,7 +3,7 @@ module github.com/halilbulentorhon/invacache-go/invalidation/drivers/couchbase
 go 1.21
 
 require (
-	github.com/halilbulentorhon/cb-pubsub v0.1.0
+	github.com/halilbulentorhon/cb-pubsub v0.1.2
 	github.com/halilbulentorhon/invacache-go v0.0.0
 )
 
