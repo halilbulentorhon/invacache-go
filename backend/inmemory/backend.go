@@ -207,7 +207,7 @@ func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) (backend.Cache[V], er
 		if i == len(shards)-1 && remainder > 0 {
 			capacity += remainder
 		}
-		shards[i] = newInMemoryShard[V](capacity)
+		shards[i] = newInMemoryShard[V](capacity, cfg.Backend.InMemory.DefaultTTL)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

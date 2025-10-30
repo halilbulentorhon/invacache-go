@@ -7,11 +7,13 @@ type OptFnc func(*SetConfig)
 type SetConfig struct {
 	TTL                 time.Duration
 	PublishInvalidation bool
+	NoExpiration        bool
 }
 
 func WithTTL(ttl time.Duration) OptFnc {
 	return func(cfg *SetConfig) {
 		cfg.TTL = ttl
+		cfg.NoExpiration = false
 	}
 }
 
@@ -24,6 +26,7 @@ func WithInvalidation() OptFnc {
 func WithNoExpiration() OptFnc {
 	return func(cfg *SetConfig) {
 		cfg.TTL = 0
+		cfg.NoExpiration = true
 	}
 }
 
@@ -39,5 +42,6 @@ func defaultSetConfig() SetConfig {
 	return SetConfig{
 		TTL:                 0,
 		PublishInvalidation: false,
+		NoExpiration:        false,
 	}
 }

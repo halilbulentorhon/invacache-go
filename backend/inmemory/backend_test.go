@@ -689,6 +689,239 @@ func TestHandleInvalidationMessageDelete(t *testing.T) {
 	}
 }
 
+func TestSetWithDefaultTTL(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "100ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	value, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	_, err = cache.Get("key1")
+	if err == nil {
+		t.Fatal("expected error for expired key with default TTL")
+	}
+}
+
+func TestSetWithDefaultTTLOverriddenByOption(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "50ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1", option.WithTTL(200*time.Millisecond))
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	value, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("key should still be valid, default TTL was overridden: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+}
+
+func TestSetWithDefaultTTLAndNoExpiration(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "50ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	value, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("key should not expire with NoExpiration option: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+}
+
+func TestNoExpirationFlagIgnoresDefaultTTL(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "100ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error setting key1: %v", err)
+	}
+
+	err = cache.Set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	value1, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("key1 should not expire with NoExpiration: %v", err)
+	}
+	if value1 != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value1)
+	}
+
+	_, err = cache.Get("key2")
+	if err == nil {
+		t.Fatal("key2 should have expired with default TTL")
+	}
+}
+
+func TestUpdateWithNoExpiration(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "50ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(30 * time.Millisecond)
+
+	err = cache.Set("key1", "value2", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error updating key: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	value, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("key should not expire after NoExpiration update: %v", err)
+	}
+	if value != "value2" {
+		t.Errorf("expected 'value2', got '%s'", value)
+	}
+}
+
+func TestDefaultTTLAppliedWhenNoOption(t *testing.T) {
+	cfg := config.InvaCacheConfig{
+		Backend: &config.BackendConfig{
+			InMemory: &config.InMemoryConfig{
+				ShardCount:      4,
+				Capacity:        100,
+				SweeperInterval: 1 * time.Minute,
+				Ttl:             "100ms",
+			},
+		},
+	}
+
+	cache, err := NewInMemoryBackend[string](cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cache.Close()
+
+	err = cache.Set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	value, err := cache.Get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(70 * time.Millisecond)
+
+	_, err = cache.Get("key1")
+	if err == nil {
+		t.Fatal("key should have expired with default TTL")
+	}
+}
+
 func createTestCache[V any](t *testing.T) backend.Cache[V] {
 	cfg := config.InvaCacheConfig{
 		Backend: &config.BackendConfig{

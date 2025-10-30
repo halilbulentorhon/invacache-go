@@ -14,6 +14,9 @@ func TestDefaultSetConfig(t *testing.T) {
 	if cfg.PublishInvalidation != false {
 		t.Error("expected PublishInvalidation false")
 	}
+	if cfg.NoExpiration != false {
+		t.Error("expected NoExpiration false")
+	}
 }
 
 func TestWithTTL(t *testing.T) {
@@ -25,6 +28,9 @@ func TestWithTTL(t *testing.T) {
 
 	if cfg.TTL != ttl {
 		t.Errorf("expected TTL %v, got %v", ttl, cfg.TTL)
+	}
+	if cfg.NoExpiration != false {
+		t.Error("expected NoExpiration false when TTL is set")
 	}
 }
 
@@ -48,6 +54,9 @@ func TestWithNoExpiration(t *testing.T) {
 	if cfg.TTL != 0 {
 		t.Errorf("expected TTL 0, got %v", cfg.TTL)
 	}
+	if !cfg.NoExpiration {
+		t.Error("expected NoExpiration true")
+	}
 }
 
 func TestApplyOptionsNoOptions(t *testing.T) {
@@ -58,6 +67,9 @@ func TestApplyOptionsNoOptions(t *testing.T) {
 	}
 	if cfg.PublishInvalidation != false {
 		t.Error("expected PublishInvalidation false")
+	}
+	if cfg.NoExpiration != false {
+		t.Error("expected NoExpiration false")
 	}
 }
 
@@ -103,6 +115,9 @@ func TestApplyOptionsNoExpirationOverridesTTL(t *testing.T) {
 	if cfg.TTL != 0 {
 		t.Errorf("expected TTL 0, got %v", cfg.TTL)
 	}
+	if !cfg.NoExpiration {
+		t.Error("expected NoExpiration true")
+	}
 }
 
 func TestApplyOptionsTTLOverridesNoExpiration(t *testing.T) {
@@ -113,5 +128,75 @@ func TestApplyOptionsTTLOverridesNoExpiration(t *testing.T) {
 
 	if cfg.TTL != 1*time.Hour {
 		t.Errorf("expected TTL 1h, got %v", cfg.TTL)
+	}
+	if cfg.NoExpiration != false {
+		t.Error("expected NoExpiration false when TTL is set after NoExpiration")
+	}
+}
+
+func TestNoExpirationFlagBasic(t *testing.T) {
+	opt := WithNoExpiration()
+
+	cfg := &SetConfig{
+		TTL:          5 * time.Minute,
+		NoExpiration: false,
+	}
+	opt(cfg)
+
+	if cfg.NoExpiration != true {
+		t.Error("expected NoExpiration true")
+	}
+	if cfg.TTL != 0 {
+		t.Errorf("expected TTL 0, got %v", cfg.TTL)
+	}
+}
+
+func TestNoExpirationFlagWithMultipleOptions(t *testing.T) {
+	cfg := ApplyOptions([]OptFnc{
+		WithInvalidation(),
+		WithNoExpiration(),
+	})
+
+	if !cfg.NoExpiration {
+		t.Error("expected NoExpiration true")
+	}
+	if !cfg.PublishInvalidation {
+		t.Error("expected PublishInvalidation true")
+	}
+	if cfg.TTL != 0 {
+		t.Errorf("expected TTL 0, got %v", cfg.TTL)
+	}
+}
+
+func TestWithTTLResetsNoExpiration(t *testing.T) {
+	cfg := &SetConfig{
+		NoExpiration: true,
+		TTL:          0,
+	}
+
+	opt := WithTTL(10 * time.Minute)
+	opt(cfg)
+
+	if cfg.NoExpiration != false {
+		t.Error("expected NoExpiration false after setting TTL")
+	}
+	if cfg.TTL != 10*time.Minute {
+		t.Errorf("expected TTL 10m, got %v", cfg.TTL)
+	}
+}
+
+func TestApplyOptionsOnlyNoExpiration(t *testing.T) {
+	cfg := ApplyOptions([]OptFnc{
+		WithNoExpiration(),
+	})
+
+	if !cfg.NoExpiration {
+		t.Error("expected NoExpiration true")
+	}
+	if cfg.TTL != 0 {
+		t.Errorf("expected TTL 0, got %v", cfg.TTL)
+	}
+	if cfg.PublishInvalidation {
+		t.Error("expected PublishInvalidation false")
 	}
 }

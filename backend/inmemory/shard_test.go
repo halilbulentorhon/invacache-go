@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewInMemoryShard(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 	if shard.capacity != 10 {
 		t.Errorf("expected capacity 10, got %d", shard.capacity)
 	}
@@ -32,7 +32,7 @@ func TestNewInMemoryShard(t *testing.T) {
 }
 
 func TestShardGetNonExistentKey(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	_, err := shard.get("nonexistent")
 	if err == nil {
@@ -44,7 +44,7 @@ func TestShardGetNonExistentKey(t *testing.T) {
 }
 
 func TestShardSetAndGet(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -65,7 +65,7 @@ func TestShardSetAndGet(t *testing.T) {
 }
 
 func TestShardSetWithTTL(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1", option.WithTTL(100*time.Millisecond))
 	if err != nil {
@@ -93,7 +93,7 @@ func TestShardSetWithTTL(t *testing.T) {
 }
 
 func TestShardSetWithNoExpiration(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1", option.WithNoExpiration())
 	if err != nil {
@@ -112,7 +112,7 @@ func TestShardSetWithNoExpiration(t *testing.T) {
 }
 
 func TestShardUpdateExistingKey(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -138,7 +138,7 @@ func TestShardUpdateExistingKey(t *testing.T) {
 }
 
 func TestShardDelete(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -161,7 +161,7 @@ func TestShardDelete(t *testing.T) {
 }
 
 func TestShardDeleteNonExistentKey(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.delete("nonexistent")
 	if err != nil {
@@ -170,7 +170,7 @@ func TestShardDeleteNonExistentKey(t *testing.T) {
 }
 
 func TestShardCapacityEviction(t *testing.T) {
-	shard := newInMemoryShard[string](2)
+	shard := newInMemoryShard[string](2, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -208,7 +208,7 @@ func TestShardCapacityEviction(t *testing.T) {
 }
 
 func TestShardLRUBehavior(t *testing.T) {
-	shard := newInMemoryShard[string](2)
+	shard := newInMemoryShard[string](2, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -242,7 +242,7 @@ func TestShardLRUBehavior(t *testing.T) {
 }
 
 func TestShardSweepExpired(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1", option.WithTTL(50*time.Millisecond))
 	if err != nil {
@@ -287,7 +287,7 @@ func TestShardSweepExpired(t *testing.T) {
 }
 
 func TestShardSweepExpiredNoExpired(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -310,7 +310,7 @@ func TestShardSweepExpiredNoExpired(t *testing.T) {
 }
 
 func TestShardConcurrentAccess(t *testing.T) {
-	shard := newInMemoryShard[int](100)
+	shard := newInMemoryShard[int](100, 0)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -341,7 +341,7 @@ func TestShardConcurrentAccess(t *testing.T) {
 }
 
 func TestShardLinkedListOperations(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -373,7 +373,7 @@ func TestShardLinkedListOperations(t *testing.T) {
 }
 
 func TestShardRemoveTail(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -399,7 +399,7 @@ func TestShardRemoveTail(t *testing.T) {
 }
 
 func TestShardRemoveTailEmpty(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	tailEntry := shard.removeTail()
 	if tailEntry != nil {
@@ -408,8 +408,8 @@ func TestShardRemoveTailEmpty(t *testing.T) {
 }
 
 func TestShardDifferentTypes(t *testing.T) {
-	stringShard := newInMemoryShard[string](10)
-	intShard := newInMemoryShard[int](10)
+	stringShard := newInMemoryShard[string](10, 0)
+	intShard := newInMemoryShard[int](10, 0)
 
 	err := stringShard.set("str", "hello")
 	if err != nil {
@@ -439,7 +439,7 @@ func TestShardDifferentTypes(t *testing.T) {
 }
 
 func TestShardClearEmpty(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	shard.clear()
 
@@ -458,7 +458,7 @@ func TestShardClearEmpty(t *testing.T) {
 }
 
 func TestShardClearWithItems(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -496,7 +496,7 @@ func TestShardClearWithItems(t *testing.T) {
 }
 
 func TestShardClearAndReuse(t *testing.T) {
-	shard := newInMemoryShard[string](10)
+	shard := newInMemoryShard[string](10, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -539,7 +539,7 @@ func TestShardClearAndReuse(t *testing.T) {
 }
 
 func TestShardClearResetsCapacity(t *testing.T) {
-	shard := newInMemoryShard[string](3)
+	shard := newInMemoryShard[string](3, 0)
 
 	err := shard.set("key1", "value1")
 	if err != nil {
@@ -577,5 +577,174 @@ func TestShardClearResetsCapacity(t *testing.T) {
 
 	if shard.count != 3 {
 		t.Errorf("expected count 3 after eviction, got %d", shard.count)
+	}
+}
+
+func TestShardDefaultTTL(t *testing.T) {
+	shard := newInMemoryShard[string](10, 100*time.Millisecond)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Fatal("expected error for expired key with default TTL")
+	}
+}
+
+func TestShardDefaultTTLOverriddenByOption(t *testing.T) {
+	shard := newInMemoryShard[string](10, 50*time.Millisecond)
+
+	err := shard.set("key1", "value1", option.WithTTL(200*time.Millisecond))
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("key should still be valid, default TTL was overridden: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(120 * time.Millisecond)
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Fatal("expected error for expired key")
+	}
+}
+
+func TestShardDefaultTTLWithNoExpiration(t *testing.T) {
+	shard := newInMemoryShard[string](10, 50*time.Millisecond)
+
+	err := shard.set("key1", "value1", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("key should not expire with NoExpiration option: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+}
+
+func TestShardNoExpirationFlagIgnoresDefaultTTL(t *testing.T) {
+	shard := newInMemoryShard[string](10, 100*time.Millisecond)
+
+	err := shard.set("key1", "value1", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	err = shard.set("key2", "value2")
+	if err != nil {
+		t.Fatalf("unexpected error setting key2: %v", err)
+	}
+
+	time.Sleep(150 * time.Millisecond)
+
+	value1, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("key1 should not expire with NoExpiration: %v", err)
+	}
+	if value1 != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value1)
+	}
+
+	_, err = shard.get("key2")
+	if err == nil {
+		t.Fatal("key2 should have expired with default TTL")
+	}
+}
+
+func TestShardUpdateWithNoExpiration(t *testing.T) {
+	shard := newInMemoryShard[string](10, 50*time.Millisecond)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(30 * time.Millisecond)
+
+	err = shard.set("key1", "value2", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error updating key: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("key should not expire after NoExpiration update: %v", err)
+	}
+	if value != "value2" {
+		t.Errorf("expected 'value2', got '%s'", value)
+	}
+}
+
+func TestShardNoExpirationWithoutDefaultTTL(t *testing.T) {
+	shard := newInMemoryShard[string](10, 0)
+
+	err := shard.set("key1", "value1", option.WithNoExpiration())
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+}
+
+func TestShardDefaultTTLAppliedWhenNoOption(t *testing.T) {
+	shard := newInMemoryShard[string](10, 100*time.Millisecond)
+
+	err := shard.set("key1", "value1")
+	if err != nil {
+		t.Fatalf("unexpected error setting key: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	value, err := shard.get("key1")
+	if err != nil {
+		t.Fatalf("unexpected error getting key: %v", err)
+	}
+	if value != "value1" {
+		t.Errorf("expected 'value1', got '%s'", value)
+	}
+
+	time.Sleep(70 * time.Millisecond)
+
+	_, err = shard.get("key1")
+	if err == nil {
+		t.Fatal("key should have expired with default TTL")
 	}
 }
