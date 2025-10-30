@@ -23,6 +23,24 @@ type inMemoryBackend[V any] struct {
 	shards       []inMemoryShard[V]
 }
 
+func (i *inMemoryBackend[V]) Clear(options ...option.ClrOptFnc) error {
+	for idx := range i.shards {
+		i.shards[idx].mu.Lock()
+		i.shards[idx].clear()
+		i.shards[idx].mu.Unlock()
+	}
+
+	cfg := option.ApplyClearOptions(options)
+
+	if cfg.PublishInvalidation {
+		if pubErr := i.publishInvalidation(constant.EmptyString); pubErr != nil {
+			i.logger.Warn("failed to publish invalidation for clear event", "error", pubErr)
+		}
+	}
+
+	return nil
+}
+
 func (i *inMemoryBackend[V]) Get(key string) (V, error) {
 	shard := i.getShard(key)
 	shard.mu.Lock()
@@ -68,14 +86,18 @@ func (i *inMemoryBackend[V]) Set(key string, value V, options ...option.OptFnc) 
 	shard.mu.Lock()
 	err := shard.set(key, value, options...)
 	shard.mu.Unlock()
+	if err != nil {
+		return err
+	}
 
-	if err == nil {
+	cfg := option.ApplyOptions(options)
+	if cfg.PublishInvalidation {
 		if pubErr := i.publishInvalidation(key); pubErr != nil {
 			i.logger.Warn("failed to publish invalidation", "key", key, "error", pubErr)
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (i *inMemoryBackend[V]) publishInvalidation(key string) error {
@@ -88,19 +110,23 @@ func (i *inMemoryBackend[V]) publishInvalidation(key string) error {
 	return nil
 }
 
-func (i *inMemoryBackend[V]) Delete(key string) error {
+func (i *inMemoryBackend[V]) Delete(key string, options ...option.DelOptFnc) error {
 	shard := i.getShard(key)
 	shard.mu.Lock()
 	err := shard.delete(key)
 	shard.mu.Unlock()
+	if err != nil {
+		return err
+	}
 
-	if err == nil {
+	cfg := option.ApplyDeleteOptions(options)
+	if cfg.PublishInvalidation {
 		if pubErr := i.publishInvalidation(key); pubErr != nil {
 			i.logger.Warn("failed to publish invalidation", "key", key, "error", pubErr)
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (i *inMemoryBackend[V]) runSweeper(shard *inMemoryShard[V], interval time.Duration) {
@@ -152,6 +178,18 @@ func getInvalidatorConfig(cfg *config.InvalidationConfig) interface{} {
 	}
 }
 
+func (i *inMemoryBackend[V]) handleInvalidationMessage(key string) error {
+	if isClearEvent(key) {
+		return i.Clear()
+	}
+
+	return i.Delete(key)
+}
+
+func isClearEvent(key string) bool {
+	return key == constant.EmptyString
+}
+
 func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) (backend.Cache[V], error) {
 	log := logger.NewLogger("inmemory-cache")
 	cfg.ApplyDefaults()
@@ -195,7 +233,7 @@ func NewInMemoryBackend[V any](cfg config.InvaCacheConfig) (backend.Cache[V], er
 				log.Debug("starting invalidation subscription")
 				err = inv.Subscribe(ctx, func(key string) error {
 					log.Debug("received invalidation", "key", key)
-					return be.Delete(key)
+					return be.handleInvalidationMessage(key)
 				})
 				if err != nil {
 					log.Info("invalidation subscription ended", "error", err)
