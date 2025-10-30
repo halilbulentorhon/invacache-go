@@ -5,12 +5,19 @@ import "time"
 type OptFnc func(*SetConfig)
 
 type SetConfig struct {
-	TTL time.Duration
+	TTL                 time.Duration
+	PublishInvalidation bool
 }
 
 func WithTTL(ttl time.Duration) OptFnc {
 	return func(cfg *SetConfig) {
 		cfg.TTL = ttl
+	}
+}
+
+func WithInvalidation() OptFnc {
+	return func(cfg *SetConfig) {
+		cfg.PublishInvalidation = true
 	}
 }
 
@@ -30,6 +37,7 @@ func ApplyOptions(options []OptFnc) SetConfig {
 
 func defaultSetConfig() SetConfig {
 	return SetConfig{
-		TTL: 0,
+		TTL:                 0,
+		PublishInvalidation: false,
 	}
 }
