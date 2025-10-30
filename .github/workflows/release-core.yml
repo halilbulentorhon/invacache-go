@@ -1,0 +1,43 @@
+name: Release Core Module
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.tag }}
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ inputs.tag }}
+        name: "InvaCache-Go ${{ inputs.tag }}"
+        body: |
+          ## InvaCache-Go Core Release ${{ inputs.tag }}
+          
+          ### Installation
+          ```bash
+          go get github.com/halilbulentorhon/invacache-go@${{ inputs.tag }}
+          ```
+          
+          ### Features
+          - High-performance in-memory cache
+          - Generic types support
+          - TTL and automatic cleanup
+          - Shard-based architecture
+          - SingleFlight pattern
+        draft: false
+        prerelease: false
+

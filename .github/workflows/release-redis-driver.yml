@@ -1,0 +1,42 @@
+name: Release Redis Driver
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: invalidation/drivers/redis/${{ inputs.tag }}
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: invalidation/drivers/redis/${{ inputs.tag }}
+        name: "Redis Driver ${{ inputs.tag }}"
+        body: |
+          ## Redis Invalidation Driver ${{ inputs.tag }}
+          
+          ### Installation
+          ```bash
+          go get github.com/halilbulentorhon/invacache-go/invalidation/drivers/redis@${{ inputs.tag }}
+          ```
+          
+          ### Features
+          - Distributed cache invalidation via Redis Pub/Sub
+          - Real-time message propagation
+          - Connection pooling and retry logic
+          - High-performance design
+        draft: false
+        prerelease: false
+

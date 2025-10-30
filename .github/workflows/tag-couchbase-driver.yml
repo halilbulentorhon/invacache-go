@@ -1,4 +1,4 @@
-name: Create Tag
+name: Tag Couchbase Driver
 
 on:
   workflow_dispatch:
@@ -21,11 +21,15 @@ jobs:
       with:
         go-version: '1.21'
     
-    - run: make test
+    - name: Test Couchbase driver
+      run: |
+        cd invalidation/drivers/couchbase
+        go test -v ./...
     
-    - name: Create and push tag
+    - name: Create and push Couchbase driver tag
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git tag ${{ inputs.tag }}
-        git push origin ${{ inputs.tag }}
+        git tag invalidation/drivers/couchbase/${{ inputs.tag }}
+        git push origin invalidation/drivers/couchbase/${{ inputs.tag }}
+
