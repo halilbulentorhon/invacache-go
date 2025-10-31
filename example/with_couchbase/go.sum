@@ -50,6 +50,7 @@ github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDa
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/halilbulentorhon/cb-pubsub v0.1.2 h1:vAn7DzfPWDZoMXsKxovV4VdRsqGYx0crsc5ZH5jayw8=
 github.com/halilbulentorhon/cb-pubsub v0.1.2/go.mod h1:voWd0bEoXZqYFZVhfdHfFkoP0iVoyy0Q/eG1NfKhhbI=
+github.com/halilbulentorhon/cb-pubsub v0.1.3/go.mod h1:voWd0bEoXZqYFZVhfdHfFkoP0iVoyy0Q/eG1NfKhhbI=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

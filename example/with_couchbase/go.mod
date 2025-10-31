@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/halilbulentorhon/invacache-go v0.0.0
-	github.com/halilbulentorhon/invacache-go/invalidation/drivers/couchbase v0.0.0
+	github.com/halilbulentorhon/invacache-go/invalidation/drivers/couchbase v0.1.3
 )
 
 require (
@@ -17,7 +17,6 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
-	github.com/halilbulentorhon/cb-pubsub v0.1.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
